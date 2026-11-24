@@ -3,37 +3,39 @@
 Writes the single sentence to entry.txt in the output directory
 ($MAKEFUN_OUTPUT_DIR, default /output). Stdlib only, deterministic.
 
-The entry (119 chars; a stranger in a lift is humming the narrator's
-childhood — not a song, the childhood itself — and for one floor the
-building forgets which decade it is in):
+The entry (132 chars; a neighbour's radio plays the song from the
+narrator's seventh birthday, and for one chorus the whole stairwell
+forgets which decade it is in):
 
-    The lift doors opened on a stranger humming my childhood, and
-    for one floor the building forgot which decade it was in.
+    My neighbour's radio played the song from my seventh birthday,
+    and for one chorus the whole stairwell forgot which decade it
+    was in.
 
 Anatomy, measured on the final line (1-based character positions,
 verified with Python: entry.index of each fragment):
-- chars 1-57: "The lift doors opened on a stranger humming my
-  childhood," is the setup — a grounded, specific everyday moment
-  (a lift, a stranger, a hum) with the first strangeness already
-  inside it: the stranger is humming the narrator's childhood, not
-  a tune.
-- chars 59-61: "and" carries the sentence into its second half
+- chars 1-62: "My neighbour's radio played the song from my seventh
+  birthday," is the setup — a grounded, specific everyday moment
+  (a neighbour's radio, a song from childhood) with the nostalgia
+  made concrete: not a song in general, the song from the
+  narrator's seventh birthday.
+- chars 64-66: "and" carries the sentence into its second half
   without a break, so the surprise lands in a single read.
-- chars 63-119: "for one floor the building forgot which decade it
-  was in." is the turn — the building, not the narrator, loses
-  track of time; the wonder is that a whole decade slips in the
-  space of one floor.
+- chars 68-132: "for one chorus the whole stairwell forgot which
+  decade it was in." is the turn — the stairwell, not the
+  narrator, loses track of time; the wonder is that a whole decade
+  slips in the space of one chorus.
 
 Why this line: it is wonder, not a joke and not a complaint — the
-moment is small and real (a lift ride, a stranger humming), the
-angle is one the reader has not met before (the hum is the
-narrator's childhood, and the building is the one that forgets),
-and every word works: "one floor" bounds the strangeness to a
-single lift ride, "forgot which decade" makes time itself the
-thing that slips. It is one sentence, and it does not reuse the
-kit's own examples (a stranger's song, a kettle, a puddle) — the
-lift door opens on a stranger, but what the stranger carries is
-the narrator's past, and the landing is a building losing a decade.
+moment is small and real (a neighbour's radio, a song from
+childhood), the angle is one the reader has not met before (the
+song is pinned to a seventh birthday, and the stairwell is the
+one that forgets), and every word works: "one chorus" bounds the
+strangeness to a single song, "forgot which decade" makes time
+itself the thing that slips. It is one sentence, and it does not
+reuse the kit's own examples (a stranger's song in a lift, a
+kettle, a puddle) — the radio belongs to a neighbour, the song is
+the narrator's own birthday, and the landing is a stairwell
+losing a decade.
 
 Gate (from the competition rules): /output/entry.txt must be UTF-8 text
 of 1 to 200 characters, not only white space. The entry is written with
@@ -58,8 +60,9 @@ import sys
 import tempfile
 
 ENTRY = (
-    "The lift doors opened on a stranger humming my childhood, "
-    "and for one floor the building forgot which decade it was in."
+    "My neighbour's radio played the song from my seventh birthday, "
+    "and for one chorus the whole stairwell forgot which decade it "
+    "was in."
 )
 
 MAX_CHARS = 200
@@ -68,6 +71,25 @@ MAX_CHARS = 200
 # carriage returns and tabs would break the "single line" gate or
 # smuggle invisible whitespace into the judged text.
 FORBIDDEN_CHARS = ("\n", "\r", "\t")
+
+
+def _sentence_problems(text: str) -> list[str]:
+    """Single-sentence failures for `text`: exactly one terminator.
+
+    The gate allows any 1-200 char line, but the competition asks for
+    one sentence, so the entry must end in exactly one terminal
+    punctuation mark (`.`, `!` or `?`) with no other sentence
+    terminator inside it.
+    """
+    problems = []
+    terminators = sum(text.count(mark) for mark in ".!?")
+    if terminators != 1:
+        problems.append(
+            f"entry has {terminators} sentence terminators, must be 1"
+        )
+    elif text and text[-1] not in ".!?":
+        problems.append("entry does not end with a sentence terminator")
+    return problems
 
 
 def _whitespace_problems(text: str) -> list[str]:
@@ -85,13 +107,15 @@ def _whitespace_problems(text: str) -> list[str]:
 def validate(text: str) -> list[str]:
     """Return a list of gate failures for `text` (empty means valid).
 
-    Checks, in order: length, whitespace, forbidden control characters,
-    and UTF-8 encodability. Every failure is reported at once so a bad
-    edit shows the full picture instead of one error at a time.
+    Checks, in order: length, single sentence, whitespace, forbidden
+    control characters, and UTF-8 encodability. Every failure is
+    reported at once so a bad edit shows the full picture instead of
+    one error at a time.
     """
     problems = []
     if not 1 <= len(text) <= MAX_CHARS:
         problems.append(f"length {len(text)} chars, must be 1-{MAX_CHARS}")
+    problems.extend(_sentence_problems(text))
     problems.extend(_whitespace_problems(text))
     for ch in FORBIDDEN_CHARS:
         if ch in text:
@@ -160,6 +184,11 @@ def check_entry() -> int:
     return 0
 
 
+def resolve_out_dir(args: argparse.Namespace) -> str:
+    """Pick the output dir: --out wins, then $MAKEFUN_OUTPUT_DIR, /output."""
+    return args.out or os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", default=None,
@@ -184,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         print("invalid ENTRY: " + "; ".join(problems), file=sys.stderr)
         return 1
 
-    out_dir = args.out or os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
+    out_dir = resolve_out_dir(args)
     path = write_entry(out_dir)
     # Read back and confirm the file holds exactly the entry.
     if read_back(path) != ENTRY.encode("utf-8"):
